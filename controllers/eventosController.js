@@ -10,9 +10,3 @@ exports.crearEvento = async (req, res) => {
   catch (err) { res.status(500).json({ error: 'DB error' }); }
 };
 
-
-// Auto-generated stubs for missing exports
-exports.obtenerEventos = (req,res) => res.status(501).json({'error':'obtenerEventos not implemented'});
-exports.crearEvento = (req,res) => res.status(501).json({'error':'crearEvento not implemented'});
-exports.actualizarEvento = (req,res) => res.status(501).json({'error':'actualizarEvento not implemented'});
-exports.eliminarEvento = (req,res) => res.status(501).json({'error':'eliminarEvento not implemented'});
