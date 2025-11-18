@@ -8,7 +8,11 @@ const db = require('./db'); // tu db.js con pool
 const app = express();
 
 app.use(express.json());
-app.use(cors()); // en producción restringir origin a tu dominio
+app.use(cors({
+  origin: ['http://localhost:4200', 'https://bentasca.com'],  // Tu frontend local y producción
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+})); // en producción restringir origin a tu dominio
 
 // ---------------------------
 // Middleware de test DB
