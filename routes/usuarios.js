@@ -69,7 +69,7 @@ router.put('/change-password', auth, async (req, res) => {
   }
 });
 
-// Subir foto de perfil (base64 o iconos pre-generados)
+// Subir foto de perfil (base64 desde frontend)
 router.put('/foto', auth, async (req, res) => {
   const { foto } = req.body;
 
@@ -77,20 +77,14 @@ router.put('/foto', auth, async (req, res) => {
     return res.status(400).json({ error: 'Falta la foto' });
   }
 
-  // Caso 1: data URL base64 (como antes)
-  const esDataUrl = foto.startsWith('data:image');
-
-  if (esDataUrl) {
+  // Si viene en formato data URL, validamos un poco el tamaño
+  if (foto.startsWith('data:image')) {
     const base64Data = foto.split(',')[1] || '';
-
-    // Si querés mantener un límite, subilo un poco
+    // límite algo más alto (≈3.5 MB)
     if (base64Data.length > 5_000_000) {
       return res.status(400).json({ error: 'Imagen demasiado grande (máx ~3.5MB)' });
     }
   }
-
-  // Si NO es data:image, igual lo aceptamos (pueden ser iconos fijos, etc.)
-  // Solo lo guardamos tal cual en la columna foto.
 
   try {
     await db.query('UPDATE usuarios SET foto = ? WHERE id = ?', [foto, req.user.id]);
