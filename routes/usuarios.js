@@ -1,4 +1,4 @@
-// routes/usuarios.js → VERSIÓN FINAL 100% FUNCIONAL
+// routes/usuarios.js → FINAL, LIMPIO Y FUNCIONAL
 const express = require('express');
 const router = express.Router();
 const auth = require('../middlewares/auth');
@@ -7,38 +7,12 @@ const ctrl = require('../controllers/usuariosController');
 const db = require('../db');
 const bcrypt = require('bcryptjs');
 
-// AUTH
 router.post('/register', ctrl.register);
 router.post('/login', ctrl.login);
 
-// USUARIO LOGUEADO
+// RUTAS NUEVAS (SOLO ESTAS DOS)
 router.get('/me', auth, (req, res) => {
-  res.json({
-    id: req.user.id,
-    nombre: req.user.nombre || '',
-    apellido: req.user.apellido || '',
-    email: req.user.email,
-    rol: req.user.rol,
-    foto: req.user.foto || null,
-    created_at: req.user.created_at || null
-  });
-});
-
-router.put('/change-password', auth, async (req, res) => {
-  const { actual, nueva } = req.body;
-  if (!actual || !nueva) return res.status(400).json({ error: 'Faltan datos' });
-
-  try {
-    const [rows] = await db.query('SELECT password FROM usuarios WHERE id = ?', [req.user.id]);
-    if (!bcrypt.compareSync(actual, rows[0].password)) {
-      return res.status(401).json({ error: 'Contraseña actual incorrecta' });
-    }
-    const hash = bcrypt.hashSync(nueva, 10);
-    await db.query('UPDATE usuarios SET password = ? WHERE id = ?', [hash, req.user.id]);
-    res.json({ mensaje: 'Contraseña actualizada' });
-  } catch (err) {
-    res.status(500).json({ error: 'Error del servidor' });
-  }
+  res.json(req.user); // ← tu auth.js ya carga todo (nombre, foto, etc)
 });
 
 router.put('/foto', auth, async (req, res) => {
@@ -48,6 +22,7 @@ router.put('/foto', auth, async (req, res) => {
   }
   try {
     await db.query('UPDATE usuarios SET foto = ? WHERE id = ?', [foto, req.user.id]);
+    req.user.foto = foto; // actualiza en memoria
     res.json({ mensaje: 'Foto actualizada', foto });
   } catch (err) {
     res.status(500).json({ error: 'Error al guardar foto' });
