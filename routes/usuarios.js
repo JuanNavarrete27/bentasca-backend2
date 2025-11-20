@@ -1,19 +1,16 @@
-
+// routes/usuarios.js → VERSIÓN FINAL CORRECTA
 const express = require('express');
 const router = express.Router();
 const auth = require('../middlewares/auth');
 const soloAdmin = require('../middlewares/soloAdmin');
 const ctrl = require('../controllers/usuariosController');
+const db = require('../db');
+const bcrypt = require('bcryptjs');
 
 router.post('/register', ctrl.register);
 router.post('/login', ctrl.login);
 
-router.get('/', auth, soloAdmin, ctrl.listUsers);
-router.get('/:id', auth, soloAdmin, ctrl.getUser);
-router.put('/:id', auth, soloAdmin, ctrl.updateUser);
-router.delete('/:id', auth, soloAdmin, ctrl.deleteUser);
-// routes/usuarios.js → AGREGÁ ESTO AL FINAL (antes del module.exports)
-
+// === NUEVAS RUTAS QUE FALTABAN ===
 router.get('/me', auth, (req, res) => {
   res.json({
     id: req.user.id,
@@ -44,5 +41,11 @@ router.put('/change-password', auth, async (req, res) => {
     res.status(500).json({ error: 'Error en servidor' });
   }
 });
+// === FIN NUEVAS RUTAS ===
+
+router.get('/', auth, soloAdmin, ctrl.listUsers);
+router.get('/:id', auth, soloAdmin, ctrl.getUser);
+router.put('/:id', auth, soloAdmin, ctrl.updateUser);
+router.delete('/:id', auth, soloAdmin, ctrl.deleteUser);
 
 module.exports = router;
