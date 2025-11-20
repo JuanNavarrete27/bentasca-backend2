@@ -10,11 +10,6 @@ const bcrypt = require('bcryptjs');
 router.post('/register', ctrl.register);
 router.post('/login', ctrl.login);
 
-// RUTAS NUEVAS (SOLO ESTAS DOS)
-router.get('/me', auth, (req, res) => {
-  res.json(req.user); // ← tu auth.js ya carga todo (nombre, foto, etc)
-});
-
 router.put('/foto', auth, async (req, res) => {
   const { foto } = req.body;
   if (!foto || !foto.startsWith('data:image')) {
@@ -34,5 +29,22 @@ router.get('/', auth, soloAdmin, ctrl.listUsers);
 router.get('/:id', auth, soloAdmin, ctrl.getUser);
 router.put('/:id', auth, soloAdmin, ctrl.updateUser);
 router.delete('/:id', auth, soloAdmin, ctrl.deleteUser);
+
+// RUTA PARA OBTENER MI PERFIL
+router.get('/me', auth, async (req, res) => {
+  try {
+    const [rows] = await db.query(
+      'SELECT id, nombre, apellido, email, rol, foto, created_at FROM usuarios WHERE id = ?',
+      [req.user.id]
+    );
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+    res.json(rows[0]);
+  } catch (err) {
+    console.error('Error en /me:', err);
+    res.status(500).json({ error: 'Error del servidor' });
+  }
+});
 
 module.exports = router;
