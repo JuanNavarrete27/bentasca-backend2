@@ -95,4 +95,37 @@ router.get('/:id', auth, soloAdmin, ctrl.getUser);
 router.put('/:id', auth, soloAdmin, ctrl.updateUser);
 router.delete('/:id', auth, soloAdmin, ctrl.deleteUser);
 
+// RUTA PERFIL (get /usuarios/me)
+router.get('/me', auth, (req, res) => {
+  const { id, email, rol, nombre, apellido } = req.user;
+  res.json({
+    id,
+    nombre,
+    apellido,
+    email,
+    rol
+  });
+});
+
+// RUTA CAMBIAR PASSWORD (put /usuarios/change-password)
+router.put('/change-password', auth, async (req, res) => {
+  const { actual, nueva } = req.body;
+  if (!actual || !nueva) return res.status(400).json({ error: 'Faltan datos' });
+
+  try {
+    const [rows] = await db.query('SELECT password FROM usuarios WHERE id = ?', [req.user.id]);
+    if (rows.length === 0) return res.status(404).json({ error: 'Usuario no encontrado' });
+
+    const passwordValido = bcrypt.compareSync(actual, rows[0].password);
+    if (!passwordValido) return res.status(401).json({ error: 'Contraseña actual incorrecta' });
+
+    const hash = bcrypt.hashSync(nueva, 10);
+    await db.query('UPDATE usuarios SET password = ? WHERE id = ?', [hash, req.user.id]);
+
+    res.json({ mensaje: 'Contraseña actualizada' });
+  } catch (err) {
+    res.status(500).json({ error: 'Error del servidor' });
+  }
+});
+
 module.exports = router;
