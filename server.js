@@ -8,13 +8,15 @@ const db = require('./db');
 
 const app = express();
 
-app.use(express.json());
-
+// CORS: permitir Angular en localhost y tu dominio en producción
 app.use(cors({
   origin: ['http://localhost:4200', 'https://bentasca.com'],
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
+
+// Parseo JSON
+app.use(express.json());
 
 // Ping de conexión a DB (opcional pero útil en servidores free)
 app.use(async (req, res, next) => {
