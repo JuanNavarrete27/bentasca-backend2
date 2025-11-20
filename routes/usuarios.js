@@ -108,4 +108,26 @@ router.put('/change-password', auth, async (req, res) => {
     res.status(500).json({ error: 'Error del servidor' });
   }
 });
+
+
+// Ruta para obtener mi perfil (necesaria para el header y perfil)
+router.get('/me', auth, ctrl.getMiPerfil);
+
+// Ruta para actualizar foto (base64)
+router.put('/foto', auth, async (req, res) => {
+  const { foto } = req.body;
+  if (!foto || !foto.startsWith('data:image')) {
+    return res.status(400).json({ error: 'Foto inválida' });
+  }
+  try {
+    await require('../db').query(
+      'UPDATE usuarios SET foto = ? WHERE id = ?',
+      [foto, req.user.id]
+    );
+    res.json({ mensaje: 'Foto actualizada', foto });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Error al guardar foto' });
+  }
+});
 module.exports = router;
