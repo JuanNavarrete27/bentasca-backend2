@@ -1,19 +1,32 @@
-// routes/usuarios.js → VERSIÓN FINAL DEFINITIVA (SIN DUPLICADOS, SIN ERRORES)
 const express = require('express');
 const router = express.Router();
 const auth = require('../middlewares/auth');
 const soloAdmin = require('../middlewares/soloAdmin');
 const ctrl = require('../controllers/usuariosController');
 
-// AUTH PÚBLICO
+// AUTH PÚBLICO (lo que ya funcionaba)
 router.post('/register', ctrl.register);
 router.post('/login', ctrl.login);
 
-// USUARIO AUTENTICADO → USANDO TUS FUNCIONES PERFECTAS
-router.get('/me', auth, ctrl.getMiPerfil);           // ← PERFECTO
-router.put('/foto', auth, ctrl.actualizarFoto);      // ← PERFECTO
+// SOLO AGREGÁ ESTAS 2 RUTAS (para perfil y foto)
+router.get('/me', auth, (req, res) => {
+  res.json(req.user);
+});
 
-// ADMIN
+router.put('/foto', auth, async (req, res) => {
+  const { foto } = req.body;
+  if (!foto || !foto.startsWith('data:image')) {
+    return res.status(400).json({ error: 'Foto inválida' });
+  }
+  try {
+    await require('../db').query('UPDATE usuarios SET foto = ? WHERE id = ?', [foto, req.user.id]);
+    res.json({ mensaje: 'Foto actualizada', foto });
+  } catch (err) {
+    res.status(500).json({ error: 'Error al guardar foto' });
+  }
+});
+
+// ADMIN (lo que ya funcionaba)
 router.get('/', auth, soloAdmin, ctrl.listUsers);
 router.get('/:id', auth, soloAdmin, ctrl.getUser);
 router.put('/:id', auth, soloAdmin, ctrl.updateUser);
