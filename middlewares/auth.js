@@ -1,23 +1,24 @@
-/*
-  middlewares/auth.js - verifica JWT en Authorization: Bearer <token>
-*/
+// middlewares/auth.js
 const jwt = require('jsonwebtoken');
+const db = require('../db');
 
-module.exports = function (req, res, next) {
-  const authHeader = req.headers['authorization'];
-  if (!authHeader) return res.status(401).json({ error: 'No token provided' });
+module.exports = async (req, res, next) => {
+  const authHeader = req.header('Authorization');
+  if (!authHeader) return res.status(401).json({ error: 'Acceso denegado' });
 
-  const parts = authHeader.split(' ');
-  if (parts.length !== 2 || parts[0] !== 'Bearer') {
-    return res.status(401).json({ error: 'Token mal formado' });
-  }
+  const token = authHeader.replace('Bearer ', '');
+  if (!token) return res.status(401).json({ error: 'Acceso denegado' });
 
-  const token = parts[1];
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'changeme');
+    
+    // ←←← CLAVE: CARGAR EL USUARIO COMPLETO DE LA DB
+    const [rows] = await db.query('SELECT id, nombre, apellido, email, rol, foto FROM usuarios WHERE id = ?', [decoded.id]);
+    if (rows.length === 0) return res.status(401).json({ error: 'Token inválido' });
 
-  jwt.verify(token, process.env.JWT_SECRET || 'changeme', (err, decoded) => {
-    if (err) return res.status(401).json({ error: 'Token inválido o expirado' });
-
-    req.user = decoded; // 👈 MUY IMPORTANTE
+    req.user = rows[0]; // ← AHORA req.user tiene nombre, foto, etc.
     next();
-  });
+  } catch (err) {
+    res.status(401).json({ error: 'Token inválido' });
+  }
 };
