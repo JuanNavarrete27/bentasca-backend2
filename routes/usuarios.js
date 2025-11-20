@@ -17,6 +17,7 @@ router.post('/login', ctrl.login);
 // USUARIO AUTENTICADO
 // -------------------------
 
+// Obtener mi perfil SIEMPRE desde la DB
 router.get('/me', auth, async (req, res) => {
   try {
     const [rows] = await db.query(
@@ -29,6 +30,7 @@ router.get('/me', auth, async (req, res) => {
     }
 
     const u = rows[0];
+
     res.json({
       id: u.id,
       nombre: u.nombre || '',
