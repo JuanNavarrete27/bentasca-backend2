@@ -1,68 +1,44 @@
 /*
-  server.js - entrypoint
+  server.js
 */
 const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
-const db = require('./db'); // tu db.js con pool
+const db = require('./db');
+
 const app = express();
 
 app.use(express.json());
+
 app.use(cors({
-  origin: ['http://localhost:4200', 'https://bentasca.com'],  // Tu frontend local y producción
+  origin: ['http://localhost:4200', 'https://bentasca.com'],
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization']
-})); // en producción restringir origin a tu dominio
+}));
 
-// ---------------------------
-// Middleware de test DB
-// ---------------------------
+// Ping de conexión a DB (opcional pero útil en servidores free)
 app.use(async (req, res, next) => {
   try {
-    await db.query('SELECT 1'); // prueba de conexión
+    await db.query('SELECT 1');
     next();
   } catch (err) {
-    console.error('Error de conexión a DB, reintentando...', err);
-    try {
-      await db.query('SELECT 1'); // segundo intento
-      next();
-    } catch (err2) {
-      console.error('Error de conexión persistente a DB:', err2);
-      res.status(500).json({ error: 'DB no disponible, intente más tarde' });
-    }
+    console.error('Error de DB:', err);
+    res.status(500).json({ error: 'DB no disponible' });
   }
 });
 
-// ---------------------------
-// routes
-// ---------------------------
-const usuariosRoutes = require('./routes/usuarios');
-const tablasRoutes = require('./routes/tablas');
-const goleadoresRoutes = require('./routes/goleadores');
-const eventosRoutes = require('./routes/eventos');
+// Rutas
+app.use('/usuarios', require('./routes/usuarios'));
+app.use('/tablas', require('./routes/tablas'));
+app.use('/goleadores', require('./routes/goleadores'));
+app.use('/eventos', require('./routes/eventos'));
 
-app.use('/usuarios', usuariosRoutes);
-app.use('/tablas', tablasRoutes);
-app.use('/goleadores', goleadoresRoutes);
-app.use('/eventos', eventosRoutes);
-
-// ruta raíz
 app.get('/', (req, res) => res.send('Bentasca backend (bcryptjs)'));
 
-// ---------------------------
-// server listen
-// ---------------------------
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Server listening on port ${PORT}`));
 
-// ---------------------------
-// Keep-alive ping cada 5 minutos
-// ---------------------------
-setInterval(async () => {
-  try {
-    await db.query('SELECT 1');
-    console.log('Ping DB exitoso');
-  } catch (err) {
-    console.error('Ping DB fallido:', err);
-  }
-}, 5 * 60 * 1000); // cada 5 minutos
+// Keep-alive DB ping
+setInterval(() => {
+  db.query('SELECT 1').catch(err => console.error('Ping DB fallido:', err));
+}, 5 * 60 * 1000);
