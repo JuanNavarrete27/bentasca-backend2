@@ -1,5 +1,5 @@
 /*
-  server.js
+  server.js — versión corregida para CORS en Render
 */
 const express = require('express');
 const cors = require('cors');
@@ -8,39 +8,51 @@ const db = require('./db');
 
 const app = express();
 
-// CORS: permitir Angular en localhost y tu dominio en producción
-app.use(cors({
-  origin: ['http://localhost:4200', 'https://bentasca.com'],
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
+/* ============================================================
+   CORS — ESTA ES LA CONFIGURACIÓN CORRECTA PARA RENDER + ANGULAR
+   ============================================================ */
+app.use(
+  cors({
+    origin: [
+      'http://localhost:4200',
+      'https://bentasca.com',
+      'https://bentasca-backend2.onrender.com'
+    ],
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept']
+  })
+);
 
-// Parseo JSON
-app.use(express.json());
+// Necesario para permitir preflight requests CORS
+app.options('*', cors());
 
-// Ping de conexión a DB (opcional pero útil en servidores free)
-app.use(async (req, res, next) => {
-  try {
-    await db.query('SELECT 1');
-    next();
-  } catch (err) {
-    console.error('Error de DB:', err);
-    res.status(500).json({ error: 'DB no disponible' });
-  }
-});
+/* ============================================================
+   JSON PARSER (ANTES DE LAS RUTAS)
+   ============================================================ */
+app.use(express.json({ limit: '10mb' })); // necesario para fotos/avatars
 
-// Rutas
+/* ============================================================
+   RUTAS — IMPORTANTE: VAN DESPUÉS DE CORS Y JSON
+   ============================================================ */
 app.use('/usuarios', require('./routes/usuarios'));
 app.use('/tablas', require('./routes/tablas'));
 app.use('/goleadores', require('./routes/goleadores'));
 app.use('/eventos', require('./routes/eventos'));
 
-app.get('/', (req, res) => res.send('Bentasca backend (bcryptjs)'));
+app.get('/', (req, res) => res.send('Bentasca backend funcionando correctamente'));
 
+/* ============================================================
+   LEVANTAR SERVIDOR
+   ============================================================ */
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Server listening on port ${PORT}`));
 
-// Keep-alive DB ping
+/* ============================================================
+   KEEP ALIVE DB — SOLO EN PRODUCCIÓN
+   ============================================================ */
 setInterval(() => {
-  db.query('SELECT 1').catch(err => console.error('Ping DB fallido:', err));
+  db.query('SELECT 1').catch(err =>
+    console.error('Ping DB fallido:', err)
+  );
 }, 5 * 60 * 1000);
