@@ -1,4 +1,4 @@
-// routes/usuarios.js → VERSIÓN FINAL, LIMPIA Y 100% FUNCIONAL
+// routes/usuarios.js → VERSIÓN FINAL, CORREGIDA Y FUNCIONAL
 const express = require('express');
 const router = express.Router();
 const auth = require('../middlewares/auth');
@@ -69,7 +69,9 @@ router.put('/change-password', auth, async (req, res) => {
   }
 });
 
-// Subir foto de perfil (base64 desde frontend)
+// -------------------------
+// ACTUALIZAR FOTO DE PERFIL
+// -------------------------
 router.put('/actualizar-foto', auth, async (req, res) => {
   const { foto } = req.body;
 
@@ -78,28 +80,21 @@ router.put('/actualizar-foto', auth, async (req, res) => {
   }
 
   try {
-    // Actualiza solo el nombre del avatar en DB
     await db.query(
       'UPDATE usuarios SET foto = ? WHERE id = ?',
       [foto, req.user.id]
     );
 
-    res.json({ mensaje: 'Avatar actualizado correctamente' });
+    res.json({
+      mensaje: 'Avatar actualizado correctamente',
+      foto
+    });
   } catch (error) {
-    console.error(error);
+    console.error('Error guardando foto:', error);
     res.status(500).json({ error: 'Error al actualizar avatar' });
   }
 });
 
-
-  try {
-    await db.query('UPDATE usuarios SET foto = ? WHERE id = ?', [foto, req.user.id]);
-    return res.json({ mensaje: 'Foto actualizada', foto });
-  } catch (err) {
-    console.error('Error guardando foto:', err);
-    return res.status(500).json({ error: 'Error al guardar foto' });
-  }
-});
 // -------------------------
 // ADMIN
 // -------------------------
