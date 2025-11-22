@@ -70,21 +70,27 @@ router.put('/change-password', auth, async (req, res) => {
 });
 
 // Subir foto de perfil (base64 desde frontend)
-router.put('/foto', auth, async (req, res) => {
+router.put('/actualizar-foto', auth, async (req, res) => {
   const { foto } = req.body;
 
   if (!foto) {
-    return res.status(400).json({ error: 'Falta la foto' });
+    return res.status(400).json({ error: 'Debe enviar el nombre del avatar' });
   }
 
-  // Si viene en formato data URL, validamos un poco el tamaño
-  if (foto.startsWith('data:image')) {
-    const base64Data = foto.split(',')[1] || '';
-    // límite algo más alto (≈3.5 MB)
-    if (base64Data.length > 5_000_000) {
-      return res.status(400).json({ error: 'Imagen demasiado grande (máx ~3.5MB)' });
-    }
+  try {
+    // Actualiza solo el nombre del avatar en DB
+    await db.query(
+      'UPDATE usuarios SET foto = ? WHERE id = ?',
+      [foto, req.user.id]
+    );
+
+    res.json({ mensaje: 'Avatar actualizado correctamente' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Error al actualizar avatar' });
   }
+});
+
 
   try {
     await db.query('UPDATE usuarios SET foto = ? WHERE id = ?', [foto, req.user.id]);
