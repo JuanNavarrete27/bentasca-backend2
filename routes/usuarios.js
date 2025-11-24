@@ -72,7 +72,7 @@ router.put('/change-password', auth, async (req, res) => {
 // -------------------------
 // ACTUALIZAR FOTO DE PERFIL (solo nombre de avatar)
 // -------------------------
-router.put('/actualizar-foto', auth, async (req, res) => {
+router.put('/actualizar-foto', async (req, res) => {
   const { foto } = req.body;
 
   // Validación básica
