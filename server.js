@@ -11,22 +11,20 @@ const app = express();
 /* ============================================================
    CORS — ESTA ES LA CONFIGURACIÓN CORRECTA PARA RENDER + ANGULAR
    ============================================================ */
-app.use(
-  cors({
-    origin: [
-      'http://localhost:4200',
-      'https://bentasca.com',
-      'https://bentasca-backend2.onrender.com'
-    ],
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'Accept']
-  })
-);
+app.use(cors({
+  origin: [
+    'http://localhost:4200',
+    'https://bentasca.com',
+    'https://bentasca-backend2.onrender.com'
+  ],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+  exposedHeaders: ['Content-Length', 'X-Foo', 'X-Bar']
+}));
 
-// Necesario para permitir preflight requests CORS
+// Asegúrate de que esto esté ANTES de las rutas
 app.options('*', cors());
-
 /* ============================================================
    JSON PARSER (ANTES DE LAS RUTAS)
    ============================================================ */
