@@ -1,6 +1,7 @@
 /*
-  db.js - mysql2 pool connection
+  db.js - mysql2 pool connection (CORREGIDO)
 */
+require('dotenv').config();
 const mysql = require('mysql2');
 
 const pool = mysql.createPool({
@@ -12,6 +13,7 @@ const pool = mysql.createPool({
   waitForConnections: true,
   connectionLimit: 4,
   queueLimit: 0
-}).promise();
+});
 
-module.exports = pool;
+// 🚀 Exportamos el pool con promesas (correcto)
+module.exports = pool.promise();
