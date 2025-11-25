@@ -23,21 +23,23 @@ exports.crearReserva = async (req, res) => {
       mensaje || ''
     ];
 
-    // 🔥 USAMOS PROMISES PARA EVITAR CRASHEOS
-    const [result] = await db.promise().query(sql, values).catch(err => {
+    // 🔥 USO CORRECTO: db.query()
+    let result;
+    try {
+      const [insertResult] = await db.query(sql, values);
+      result = insertResult;
+    } catch (err) {
       if (err.code === 'ER_DUP_ENTRY') {
-        return { dup: true };
+        return res.status(400).json({
+          error: 'Ya hay una reserva para esa fecha, hora y cancha'
+        });
       }
       throw err;
-    });
-
-    if (result && result.dup) {
-      return res.status(400).json({
-        error: 'Ya hay una reserva para esa fecha, hora y cancha'
-      });
     }
 
-    // Config mail
+    // ================================
+    // 📩 CONFIGURACIÓN EMAIL
+    // ================================
     const transporter = nodemailer.createTransport({
       service: 'gmail',
       auth: {
@@ -48,12 +50,17 @@ exports.crearReserva = async (req, res) => {
 
     const htmlEmail = `
       <div style="font-family: Arial; padding: 20px;">
+        <img src="cid:logoBentasca" alt="logo" style="width:120px; margin-bottom:20px;" />
         <h2>Reserva confirmada</h2>
+
         <p><strong>Nombre:</strong> ${nombre}</p>
         <p><strong>Fecha:</strong> ${fecha}</p>
         <p><strong>Hora:</strong> ${hora}</p>
         <p><strong>Cancha:</strong> ${cancha}</p>
         <p><strong>Duración:</strong> ${duracion} hora/s</p>
+
+        ${mensaje ? `<p><strong>Mensaje:</strong> ${mensaje}</p>` : ""}
+
         <br>
         <p>Ubicación: <a href="https://maps.app.goo.gl/gx3WY1hgbot16C8f8">Google Maps</a></p>
         <hr>
@@ -61,22 +68,40 @@ exports.crearReserva = async (req, res) => {
       </div>
     `;
 
-    // Enviar al usuario
+    // ================================
+    // 📩 ENVÍO DE EMAIL AL CLIENTE
+    // ================================
     if (email) {
       await transporter.sendMail({
         from: `"Bentasca" <${process.env.SMTP_USER}>`,
         to: email,
         subject: "Reserva confirmada ✔",
-        html: htmlEmail
+        html: htmlEmail,
+        attachments: [
+          {
+            filename: "logo.png",
+            path: "/mnt/data/logo.png",
+            cid: "logoBentasca"
+          }
+        ]
       });
     }
 
-    // Enviar al administrador
+    // ================================
+    // 📩 ENVÍO DE EMAIL PARA EL ADMIN
+    // ================================
     await transporter.sendMail({
       from: `"Bentasca" <${process.env.SMTP_USER}>`,
       to: process.env.SMTP_ADMIN,
       subject: "Nueva Reserva (Admin)",
-      html: htmlEmail
+      html: htmlEmail,
+      attachments: [
+        {
+          filename: "logo.png",
+          path: "/mnt/data/logo.png",
+          cid: "logoBentasca"
+        }
+      ]
     });
 
     res.json({
@@ -85,7 +110,7 @@ exports.crearReserva = async (req, res) => {
     });
 
   } catch (error) {
-    console.error(error);
+    console.error("Error en crearReserva:", error);
     res.status(500).json({ error: 'Error interno al crear la reserva' });
   }
 };
