@@ -1,16 +1,21 @@
+// reservasController.js  ← este es el nombre correcto del archivo
 const db = require('../db');
 const { MailerSend, EmailParams, Sender, Recipient } = require("mailersend");
 
 const mailer = new MailerSend({
-  apiKey: process.env.MAILERSEND_API_KEY,
+  apiKey: process.env.MAILERSEND_API_KEY?.trim(),
 });
 
-const TEMPLATE_ID = "0r83ql3yx7pgzw1j"; // Tu template verificado
+const TEMPLATE_ID = "0r83ql3yx7pgzw1j";
 
 exports.crearReserva = async (req, res) => {
+  let reservaGuardada = false;
+  let reservaId = null;
+
   try {
     const { nombre, telefono, email, fecha, hora, cancha, duracion, tipo, mensaje } = req.body;
 
+    // --- 1. GUARDAR EN BASE DE DATOS (esto nunca debe fallar la respuesta) ---
     const sql = `
       INSERT INTO reservas
       (nombre, telefono, email, fecha, hora, cancha, duracion, tipo, mensaje)
@@ -18,83 +23,108 @@ exports.crearReserva = async (req, res) => {
     `;
 
     const values = [
-      nombre,
-      telefono,
-      email || null,
+      nombre?.trim(),
+      telefono?.trim(),
+      email?.trim() || null,
       fecha,
       hora,
-      cancha || 'Cancha principal',
+      cancha?.trim() || 'Cancha principal',
       duracion || 1,
       tipo || 'F7',
-      mensaje || ''
+      mensaje?.trim() || ''
     ];
 
-    let insertResult;
-    try {
-      const [result] = await db.query(sql, values);
-      insertResult = result;
-    } catch (err) {
-      if (err.code === 'ER_DUP_ENTRY') {
-        return res.status(400).json({
-          error: 'Ya hay una reserva para esa fecha, hora y cancha'
-        });
-      }
-      throw err;
-    }
+    const [result] = await db.query(sql, values);
+    reservaGuardada = true;
+    reservaId = result.insertId;
 
-    // Datos que van a reemplazar las variables {{ }} del template
+    // --- 2. DATOS PARA EL TEMPLATE ---
     const personalizationData = {
-      nombre,
+      nombre: nombre?.trim() || 'Cliente',
       fecha,
       hora,
-      cancha: cancha || 'Cancha principal',
+      cancha: cancha?.trim() || 'Cancha principal',
       duracion: duracion || 1,
-      personas: duracion, // si en el futuro cambias el nombre de variable
-      telefono,
-      email: email || '',
-      mensaje: mensaje || 'Sin mensaje',
+      personas: duracion || 1,
+      telefono: telefono?.trim() || '',
+      email: email?.trim() || '',
+      mensaje: mensaje?.trim() || 'Sin mensaje adicional',
     };
 
-    // Envío al cliente (solo si puso email)
-    if (email) {
-      const emailParamsCliente = new EmailParams()
-        .setFrom(new Sender(process.env.MAILERSEND_FROM, "Bentasca"))
-        .setTo([new Recipient(email, nombre)])
-        .setReplyTo(process.env.MAILERSEND_ADMIN) // para que responda al restaurante
-        .setSubject("¡Tu reserva en Bentasca está confirmada!")
-        .setTemplateId(TEMPLATE_ID)
-        .setPersonalization([
-          {
-            email: email,
-            data: personalizationData
-          }
-        ]);
+    // --- 3. ENVÍO DE EMAILS (con try-catch separado para no romper todo) ---
+    try {
+      const from = new Sender(process.env.MAILERSEND_FROM, "Bentasca");
 
-      await mailer.email.send(emailParamsCliente);
+      // Email al cliente
+      if (email && email.includes('@')) {
+        const clienteParams = new EmailParams()
+          .setFrom(from)
+          .setTo([new Recipient(email.trim(), nombre)])
+          .setReplyTo(process.env.MAILERSEND_ADMIN)
+          .setSubject("¡Tu reserva en Bentasca está confirmada!")
+          .setTemplateId(TEMPLATE_ID)
+          .setPersonalization([{
+            email: email.trim(),
+            data: personalizationData
+          }]);
+
+        await mailer.email.send(clienteParams);
+        console.log("Email enviado al cliente:", email);
+      }
+
+      // Email al admin (siempre)
+      if (process.env.MAILERSEND_ADMIN && process.env.MAILERSEND_ADMIN.includes('@')) {
+        const adminParams = new EmailParams()
+          .setFrom(from)
+          .setTo([new Recipient(process.env.MAILERSEND_ADMIN.trim(), "Admin Bentasca")])
+          .setSubject(`Nueva reserva - ${nombre} - ${fecha} ${hora}`)
+          .setTemplateId(TEMPLATE_ID)
+          .setPersonalization([{
+            email: process.env.MAILERSEND_ADMIN.trim(),
+            data: personalizationData
+          }]);
+
+        await mailer.email.send(adminParams);
+        console.log("Email enviado al admin:", process.env.MAILERSEND_ADMIN);
+      }
+
+    } catch (emailError) {
+      // ¡Importante! Solo logueamos, pero NO rompemos la reserva
+      console.error("Error enviando emails (reserva OK):", {
+        message: emailError.message,
+        body: emailError.body || 'Sin body',
+        code: emailError.code || 'N/A'
+      });
     }
 
-    // Envío al administrador (siempre)
-    const emailParamsAdmin = new EmailParams()
-      .setFrom(new Sender(process.env.MAILERSEND_FROM, "Bentasca"))
-      .setTo([new Recipient(process.env.MAILERSEND_ADMIN, "Admin Bentasca")])
-      .setSubject(`Nueva reserva - ${nombre} - ${fecha} ${hora}`)
-      .setTemplateId(TEMPLATE_ID)
-      .setPersonalization([
-        {
-          email: process.env.MAILERSEND_ADMIN,
-          data: personalizationData
-        }
-      ]);
-
-    await mailer.email.send(emailParamsAdmin);
-
-    res.json({
+    // --- 4. RESPUESTA SIEMPRE EXITOSA SI LA RESERVA SE GUARDÓ ---
+    return res.json({
       ok: true,
-      reservaId: insertResult.insertId
+      reservaId,
+      mensaje: "Reserva creada con éxito"
     });
 
   } catch (error) {
-    console.error("Error en crearReserva:", error);
-    res.status(500).json({ error: 'Error interno al crear la reserva' });
+    // Solo llega aquí si falla la DB o algo crítico
+    console.error("Error crítico en crearReserva:", {
+      message: error.message,
+      code: error.code,
+      stack: error.stack
+    });
+
+    // Si la reserva no se guardó → 500
+    if (!reservaGuardada) {
+      return res.status(500).json({
+        error: 'Error interno al crear la reserva',
+        debug: error.message
+      });
+    }
+
+    // Si la reserva SÍ se guardó pero falló algo más → igual devolvemos OK
+    return res.json({
+      ok: true,
+      reservaId,
+      mensaje: "Reserva guardada (emails con problemas)"
+    });
   }
 };
