@@ -1,5 +1,6 @@
 const db = require('../db');
 const nodemailer = require('nodemailer');
+const path = require('path');
 
 exports.crearReserva = async (req, res) => {
   try {
@@ -11,11 +12,9 @@ exports.crearReserva = async (req, res) => {
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
     const values = [
-      nombre,
-      telefono,
+      nombre, telefono,
       email || null,
-      fecha,
-      hora,
+      fecha, hora,
       cancha || 'Cancha principal',
       duracion || 1,
       tipo || 'F7',
@@ -31,44 +30,66 @@ exports.crearReserva = async (req, res) => {
         return res.status(500).json({ error: 'Error al crear la reserva' });
       }
 
-      // Enviar email
-      if (email) {
-        try {
-          const transporter = nodemailer.createTransport({
-            host: 'smtp.gmail.com',
-            port: 465,
-            secure: true,
-            auth: {
-              user: process.env.EMAIL_USER,
-              pass: process.env.EMAIL_PASS
-            },
-            tls: {
-              rejectUnauthorized: false
-            }
-          });
-
-          await transporter.sendMail({
-            from: `"Bentasca" <${process.env.EMAIL_USER}>`,
-            to: email,
-            subject: 'Reserva confirmada - Bentasca',
-            html: `
-              <h2>¡Tu reserva fue confirmada!</h2>
-              <p><strong>Nombre:</strong> ${nombre}</p>
-              <p><strong>Fecha:</strong> ${fecha}</p>
-              <p><strong>Hora:</strong> ${hora}</p>
-              <p><strong>Cancha:</strong> ${cancha || 'Cancha principal'}</p>
-              <p><strong>Duración:</strong> ${duracion || 1} hora(s)</p>
-              <p><strong>Tipo:</strong> ${tipo || 'F7'}</p>
-
-              <p>Ubicación: <a href="https://maps.app.goo.gl/gx3WY1hgbot16C8f8">Ver en Google Maps</a></p>
-
-              <p>Gracias por reservar en <strong>Bentasca</strong> ⚽</p>
-            `
-          });
-        } catch (emailErr) {
-          console.error("Error enviando email:", emailErr);
+      // ============================
+      //   NODEMAILER
+      // ============================
+      const transporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: {
+          user: process.env.EMAIL_USER,
+          pass: process.env.EMAIL_PASS
         }
-      }
+      });
+
+      // Ruta al logo (lo dejamos en /public o /assets del backend)
+      const logoPath = path.join(__dirname, '../public/logo.png');
+
+      const emailHTML = `
+        <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
+          <div style="text-align: center;">
+            <img src="cid:logoBentasca" style="width: 140px; margin-bottom: 20px;" />
+          </div>
+
+          <h2 style="text-align:center; color:#111;">Reserva confirmada</h2>
+
+          <p>Hola <strong>${nombre}</strong>, tu reserva se confirmó correctamente.</p>
+
+          <h3>Detalles de la reserva:</h3>
+          <ul>
+            <li><strong>Fecha:</strong> ${fecha}</li>
+            <li><strong>Hora:</strong> ${hora}</li>
+            <li><strong>Cancha:</strong> ${cancha || 'Cancha principal'}</li>
+            <li><strong>Tipo:</strong> ${tipo}</li>
+            <li><strong>Duración:</strong> ${duracion} hora(s)</li>
+          </ul>
+
+          <p><strong>Ubicación:</strong> <a href="https://maps.app.goo.gl/gx3WY1hgbot16C8f8">Ver en Google Maps</a></p>
+
+          <p>Gracias por reservar en <strong>Bentasca</strong>. ¡Te esperamos! ⚽</p>
+
+          <hr>
+          <p style="font-size:12px; color:#888; text-align:center;">
+            Bentasca — Fútbol 7 · El mejor sintético de la zona
+          </p>
+        </div>
+      `;
+
+      // Cliente + Admin
+      const destinatarios = [email, process.env.EMAIL_USER].filter(Boolean);
+
+      await transporter.sendMail({
+        from: `"Bentasca" <${process.env.EMAIL_USER}>`,
+        to: destinatarios,
+        subject: 'Reserva confirmada - Bentasca',
+        html: emailHTML,
+        attachments: [
+          {
+            filename: 'logo.png',
+            path: logoPath,
+            cid: 'logoBentasca' // mismo cid que en el HTML
+          }
+        ]
+      });
 
       res.json({ ok: true, reservaId: result.insertId });
     });
