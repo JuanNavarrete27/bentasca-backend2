@@ -1,11 +1,15 @@
-// utils/mailer.js — 100% funcional sin upgrade ni sender verificado
+// utils/mailer.js — versión corregida con logs completos para Render
 const { MailerSend, EmailParams, Sender, Recipient } = require("mailersend");
 
+// Validación de API Key
+if (!process.env.MAILERSEND_API_KEY) {
+  console.error("⚠️ MAILERSEND_API_KEY NO ESTÁ DEFINIDA en variables de entorno");
+}
 const mailer = new MailerSend({
   apiKey: process.env.MAILERSEND_API_KEY?.trim(),
 });
 
-// USAMOS EL SENDER DE PRUEBA DE MAILERSEND (NO REQUIERE UPGRADE)
+// Sender de prueba (trial MailerSend)
 const sender = new Sender("MS_0r83ql3y@trial-mailersend.net", "Bentasca");
 
 /**
@@ -14,6 +18,12 @@ const sender = new Sender("MS_0r83ql3y@trial-mailersend.net", "Bentasca");
  */
 async function enviarMailReserva(reserva) {
   try {
+    // Validación de reserva mínima
+    if (!reserva || !reserva.nombre || !reserva.fecha) {
+      console.warn("⚠️ Reserva incompleta:", reserva);
+      return;
+    }
+
     const fechaBonita = new Date(reserva.fecha).toLocaleDateString('es-UY', {
       weekday: 'long',
       day: 'numeric',
@@ -40,34 +50,45 @@ async function enviarMailReserva(reserva) {
       </div>
     `;
 
-    // MAIL AL CLIENTE
+    // --- MAIL AL CLIENTE ---
     if (reserva.email && reserva.email.includes('@')) {
-      const clienteParams = new EmailParams()
-        .setFrom(sender)
-        .setTo([new Recipient(reserva.email.trim(), reserva.nombre)])
-        .setSubject(`¡Reserva confirmada! - ${fechaBonita} ${reserva.hora}h`)
-        .setHtml(html);
+      try {
+        const clienteParams = new EmailParams()
+          .setFrom(sender)
+          .setTo([new Recipient(reserva.email.trim(), reserva.nombre)])
+          .setSubject(`¡Reserva confirmada! - ${fechaBonita} ${reserva.hora}h`)
+          .setHtml(html);
 
-      await mailer.email.send(clienteParams);
-      console.log("Mail enviado al cliente:", reserva.email);
+        await mailer.email.send(clienteParams);
+        console.log("✅ Mail enviado al cliente:", reserva.email);
+      } catch (errCliente) {
+        console.error("❌ Error enviando mail al cliente:", errCliente);
+      }
+    } else {
+      console.warn("⚠️ No se envía mail al cliente, email inválido o no definido:", reserva.email);
     }
 
-    // MAIL AL ADMIN (siempre, aunque el cliente no tenga mail)
+    // --- MAIL AL ADMIN ---
     if (process.env.MAILERSEND_ADMIN?.includes('@')) {
-      const adminHtml = html.replace('¡Hola ' + reserva.nombre + '!', 'Nueva reserva recibida');
-      const adminParams = new EmailParams()
-        .setFrom(sender)
-        .setTo([new Recipient(process.env.MAILERSEND_ADMIN.trim(), "Admin")])
-        .setSubject(`NUEVA RESERVA - ${reserva.nombre} - ${fechaBonita} ${reserva.hora}h`)
-        .setHtml(adminHtml);
+      try {
+        const adminHtml = html.replace('¡Hola ' + reserva.nombre + '!', 'Nueva reserva recibida');
+        const adminParams = new EmailParams()
+          .setFrom(sender)
+          .setTo([new Recipient(process.env.MAILERSEND_ADMIN.trim(), "Admin")])
+          .setSubject(`NUEVA RESERVA - ${reserva.nombre} - ${fechaBonita} ${reserva.hora}h`)
+          .setHtml(adminHtml);
 
-      await mailer.email.send(adminParams);
-      console.log("Mail enviado al admin:", process.env.MAILERSEND_ADMIN);
+        await mailer.email.send(adminParams);
+        console.log("✅ Mail enviado al admin:", process.env.MAILERSEND_ADMIN);
+      } catch (errAdmin) {
+        console.error("❌ Error enviando mail al admin:", errAdmin);
+      }
+    } else {
+      console.warn("⚠️ MAILERSEND_ADMIN no definido o inválido");
     }
 
-  } catch (error) {
-    console.error("Error enviando mails (pero la reserva SÍ se guardó):", error.message);
-    // No rompemos nada si falla el mail
+  } catch (errorGeneral) {
+    console.error("❌ Error general enviando mails (reserva guardada OK):", errorGeneral);
   }
 }
 
