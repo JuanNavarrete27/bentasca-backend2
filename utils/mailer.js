@@ -1,27 +1,19 @@
-// utils/mailer.js — Versión Nodemailer (SMTP) optimizada para Render
-const nodemailer = require("nodemailer");
+// utils/mailer.js — Versión SendGrid API (sin SMTP)
+const sgMail = require('@sendgrid/mail');
 
-// Validaciones de entorno
-if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
-  console.error("❌ ERROR: Falta SMTP_USER o SMTP_PASS en variables de entorno.");
+// Validación de entorno
+if (!process.env.SENDGRID_API_KEY) {
+  console.error("❌ ERROR: Falta SENDGRID_API_KEY en variables de entorno.");
+}
+if (!process.env.FROM_EMAIL) {
+  console.error("❌ ERROR: Falta FROM_EMAIL (remitente) en variables de entorno.");
 }
 if (!process.env.ADMIN_EMAIL) {
   console.warn("⚠️ Advertencia: Falta ADMIN_EMAIL (mail a donde llegan las reservas).");
 }
 
-// Transporter SMTP compatible con Render + Gmail
-const transporter = nodemailer.createTransport({
-  host: "smtp.gmail.com",
-  port: 465,
-  secure: true,
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
-  },
-  tls: {
-    rejectUnauthorized: false, // Necesario en muchos despliegues Render
-  }
-});
+// Configurar API Key
+sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
 /**
  * Formatea fecha en estilo uruguayo
@@ -60,7 +52,7 @@ function buildReservaHTML(reserva, fechaBonita) {
 }
 
 /**
- * Enviar correo de reserva (cliente + admin)
+ * Enviar correo de reserva (cliente + admin) usando SendGrid
  */
 async function enviarMailReserva(reserva) {
   try {
@@ -77,8 +69,8 @@ async function enviarMailReserva(reserva) {
     // ============================
     if (reserva.email) {
       try {
-        await transporter.sendMail({
-          from: `Bentasca <${process.env.SMTP_USER}>`,
+        await sgMail.send({
+          from: process.env.FROM_EMAIL,
           to: reserva.email,
           subject: `Reserva confirmada - ${fechaBonita} ${reserva.hora || ""}h`,
           html,
@@ -94,8 +86,8 @@ async function enviarMailReserva(reserva) {
     // ============================
     if (process.env.ADMIN_EMAIL) {
       try {
-        await transporter.sendMail({
-          from: `Bentasca <${process.env.SMTP_USER}>`,
+        await sgMail.send({
+          from: process.env.FROM_EMAIL,
           to: process.env.ADMIN_EMAIL,
           subject: `NUEVA RESERVA - ${reserva.nombre}`,
           html,
