@@ -58,7 +58,7 @@ async function enviarMailReserva(reserva) {
           to: reserva.email,
           from: process.env.FROM_EMAIL,
           templateId: TEMPLATE_ID,
-          dynamicTemplateData: {
+          dynamic_template_data: {
             nombre: reserva.nombre,
             fecha: fechaBonita,
             hora: reserva.hora,
@@ -83,7 +83,7 @@ async function enviarMailReserva(reserva) {
           to: process.env.ADMIN_EMAIL,
           from: process.env.FROM_EMAIL,
           templateId: TEMPLATE_ID,
-          dynamicTemplateData: {
+          dynamic_template_data: {
             nombre: reserva.nombre,
             fecha: fechaBonita,
             hora: reserva.hora,
