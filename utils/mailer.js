@@ -1,4 +1,4 @@
-// utils/mailer.js — Versión SendGrid API (sin SMTP)
+// utils/mailer.js — SendGrid Dynamic Templates
 const sgMail = require('@sendgrid/mail');
 
 // Validación de entorno
@@ -14,6 +14,9 @@ if (!process.env.ADMIN_EMAIL) {
 
 // Configurar API Key
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+
+// Template de SendGrid
+const TEMPLATE_ID = "d-1291b0104f4542d89bffe656ad78ff94";
 
 /**
  * Formatea fecha en estilo uruguayo
@@ -35,24 +38,7 @@ function formatFechaUY(rawDate) {
 }
 
 /**
- * Construye HTML del mail
- */
-function buildReservaHTML(reserva, fechaBonita) {
-  return `
-    <div style="font-family: Arial; padding: 20px; background: #0f0f0f; color: white;">
-      <h1 style="color: #20c35a;">Reserva confirmada</h1>
-      <p><strong>Nombre:</strong> ${reserva.nombre}</p>
-      <p><strong>Fecha:</strong> ${fechaBonita}</p>
-      <p><strong>Hora:</strong> ${reserva.hora}h</p>
-      <p><strong>Cancha:</strong> ${reserva.cancha}</p>
-      <p><strong>Duración:</strong> ${reserva.duracion}h</p>
-      ${reserva.mensaje ? `<p><strong>Mensaje:</strong> ${reserva.mensaje}</p>` : ""}
-    </div>
-  `;
-}
-
-/**
- * Enviar correo de reserva (cliente + admin) usando SendGrid
+ * Enviar correo de reserva (cliente + admin) con Dynamic Template
  */
 async function enviarMailReserva(reserva) {
   try {
@@ -62,7 +48,6 @@ async function enviarMailReserva(reserva) {
     }
 
     const fechaBonita = formatFechaUY(reserva.fecha);
-    const html = buildReservaHTML(reserva, fechaBonita);
 
     // ============================
     // MAIL AL CLIENTE
@@ -70,14 +55,22 @@ async function enviarMailReserva(reserva) {
     if (reserva.email) {
       try {
         await sgMail.send({
-          from: process.env.FROM_EMAIL,
           to: reserva.email,
-          subject: `Reserva confirmada - ${fechaBonita} ${reserva.hora || ""}h`,
-          html,
+          from: process.env.FROM_EMAIL,
+          templateId: TEMPLATE_ID,
+          dynamicTemplateData: {
+            nombre: reserva.nombre,
+            fecha: fechaBonita,
+            hora: reserva.hora,
+            email: reserva.email,
+            telefono: reserva.telefono
+          }
         });
-        console.log("✅ Mail enviado al cliente:", reserva.email);
+
+        console.log("✅ Mail dinámico enviado al cliente:", reserva.email);
+
       } catch (err) {
-        console.error("❌ Error enviando mail al cliente:", err.message);
+        console.error("❌ Error enviando mail al cliente:", err.response?.body || err.message);
       }
     }
 
@@ -87,14 +80,22 @@ async function enviarMailReserva(reserva) {
     if (process.env.ADMIN_EMAIL) {
       try {
         await sgMail.send({
-          from: process.env.FROM_EMAIL,
           to: process.env.ADMIN_EMAIL,
-          subject: `NUEVA RESERVA - ${reserva.nombre}`,
-          html,
+          from: process.env.FROM_EMAIL,
+          templateId: TEMPLATE_ID,
+          dynamicTemplateData: {
+            nombre: reserva.nombre,
+            fecha: fechaBonita,
+            hora: reserva.hora,
+            email: reserva.email,
+            telefono: reserva.telefono
+          }
         });
-        console.log("📩 Mail enviado al admin:", process.env.ADMIN_EMAIL);
+
+        console.log("📩 Mail dinámico enviado al admin:", process.env.ADMIN_EMAIL);
+
       } catch (err) {
-        console.error("❌ Error enviando mail al admin:", err.message);
+        console.error("❌ Error enviando mail al admin:", err.response?.body || err.message);
       }
     }
 
