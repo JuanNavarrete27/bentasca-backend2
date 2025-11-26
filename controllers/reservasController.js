@@ -28,22 +28,19 @@ exports.crearReserva = async (req, res) => {
     }
 
     // --- VALIDACIÓN HORARIA ---
-    const [hh, mm] = hora.split(":").map(n => parseInt(n));
-
+    const [hh, mm] = hora.split(":").map(n => parseInt(n, 10));
     if (mm !== 0) {
       return res.status(400).json({
         ok: false,
         mensaje: "Las reservas deben comenzar en punto (XX:00)"
       });
     }
-
     if (hh < 19 || hh > 22) {
       return res.status(400).json({
         ok: false,
         mensaje: "El horario permitido es de 19:00 a 23:00"
       });
     }
-
     if (![1, 2].includes(Number(duracion))) {
       return res.status(400).json({
         ok: false,
@@ -61,9 +58,7 @@ exports.crearReserva = async (req, res) => {
         (TIME(hora) = TIME(DATE_ADD(?, INTERVAL 1 HOUR)))
       )
     `;
-
     const [existe] = await db.query(checkSql, [fecha, cancha, hora, hora]);
-
     if (existe.length > 0) {
       return res.status(409).json({
         ok: false,
@@ -76,7 +71,6 @@ exports.crearReserva = async (req, res) => {
       INSERT INTO reservas (nombre, telefono, email, fecha, hora, cancha, duracion, tipo, mensaje)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
-
     const values = [
       nombre.trim(),
       telefono.trim(),
@@ -115,7 +109,6 @@ exports.crearReserva = async (req, res) => {
         tipo,
         mensaje
       });
-
       console.log("📧 Mails enviados correctamente");
     } catch (mailError) {
       console.error("⚠️ Error enviando mails (reserva guardada):", mailError);
