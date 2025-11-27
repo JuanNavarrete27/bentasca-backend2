@@ -1,112 +1,105 @@
 const db = require('../db');
 
-// ===============================
-// GET tabla anual
-// ===============================
-exports.obtenerTablaAnual = async (req, res) => {
+// =======================================
+// GET tabla (anual / clausura)
+// =======================================
+exports.obtenerTabla = async (req, res) => {
   try {
-    const [rows] = await db.query(
-      'SELECT * FROM tabla_anual ORDER BY posicion ASC'
-    );
-    res.json(rows);
-  } catch (err) {
-    console.error('Error en obtenerTablaAnual:', err);
-    res.status(500).json({ error: 'Error al obtener tabla anual' });
-  }
-};
+    const { tipo } = req.params;
 
-// ===============================
-// GET tabla clausura
-// ===============================
-exports.obtenerTablaClausura = async (req, res) => {
-  try {
-    const [rows] = await db.query(
-      'SELECT * FROM tabla_clausura ORDER BY posicion ASC'
-    );
-    res.json(rows);
-  } catch (err) {
-    console.error('Error en obtenerTablaClausura:', err);
-    res.status(500).json({ error: 'Error al obtener clausura' });
-  }
-};
-
-// ===============================
-// POST nuevo equipo anual
-// ===============================
-exports.agregarEquipoAnual = async (req, res) => {
-  try {
-    const { equipo, puntos, goles_favor, goles_contra, posicion } = req.body;
-
-    if (!equipo || equipo.trim() === "") {
-      return res
-        .status(400)
-        .json({ error: 'El nombre del equipo es obligatorio' });
+    if (!['anual', 'clausura'].includes(tipo)) {
+      return res.status(400).json({ error: 'Tipo inválido' });
     }
 
-    await db.query(
-      `INSERT INTO tabla_anual 
-        (equipo, puntos, goles_favor, goles_contra, posicion)
-       VALUES (?, ?, ?, ?, ?)`,
-      [
-        equipo,
-        puntos ?? 0,
-        goles_favor ?? 0,
-        goles_contra ?? 0,
-        posicion ?? null
-      ]
+    const tabla = tipo === 'anual' ? 'tabla_anual' : 'tabla_clausura';
+
+    const [rows] = await db.query(
+      `SELECT * FROM ${tabla} ORDER BY posicion ASC`
     );
 
-    // 🔥 RESPUESTA QUE ESPERA EL FRONT
-    res.json({ mensaje: 'Equipo agregado', ok: true });
+    res.json(rows);
   } catch (err) {
-    console.error('Error en agregarEquipoAnual:', err);
+    console.error('Error en obtenerTabla:', err);
+    res.status(500).json({ error: 'Error al obtener tabla' });
+  }
+};
+
+// =======================================
+// POST nuevo equipo
+// =======================================
+exports.agregarEquipo = async (req, res) => {
+  try {
+    const { tipo, equipo, puntos, goles_favor, goles_contra, posicion } = req.body;
+
+    if (!tipo || !['anual', 'clausura'].includes(tipo)) {
+      return res.status(400).json({ error: 'Tipo inválido' });
+    }
+
+    if (!equipo) {
+      return res.status(400).json({ error: 'El nombre del equipo es obligatorio' });
+    }
+
+    const tabla = tipo === 'anual' ? 'tabla_anual' : 'tabla_clausura';
+
+    await db.query(
+      `INSERT INTO ${tabla} (equipo, puntos, goles_favor, goles_contra, posicion)
+       VALUES (?, ?, ?, ?, ?)`,
+      [equipo, puntos || 0, goles_favor || 0, goles_contra || 0, posicion || null]
+    );
+
+    res.json({ mensaje: 'Equipo agregado con éxito' });
+  } catch (err) {
+    console.error('Error en agregarEquipo:', err);
     res.status(500).json({ error: 'Error al agregar equipo' });
   }
 };
 
-// ===============================
-// PUT actualizar equipo anual
-// ===============================
-exports.actualizarEquipoAnual = async (req, res) => {
+// =======================================
+// PUT actualizar equipo
+// =======================================
+exports.actualizarEquipo = async (req, res) => {
   try {
+    const { tipo, equipo, puntos, goles_favor, goles_contra, posicion } = req.body;
     const { id } = req.params;
-    const { equipo, puntos, goles_favor, goles_contra, posicion } = req.body;
+
+    if (!tipo || !['anual', 'clausura'].includes(tipo)) {
+      return res.status(400).json({ error: 'Tipo inválido' });
+    }
+
+    const tabla = tipo === 'anual' ? 'tabla_anual' : 'tabla_clausura';
 
     await db.query(
-      `UPDATE tabla_anual 
-       SET equipo=?, puntos=?, goles_favor=?, goles_contra=?, posicion=? 
+      `UPDATE ${tabla} SET equipo=?, puntos=?, goles_favor=?, goles_contra=?, posicion=?
        WHERE id=?`,
-      [
-        equipo,
-        puntos ?? 0,
-        goles_favor ?? 0,
-        goles_contra ?? 0,
-        posicion ?? null,
-        id
-      ]
+      [equipo, puntos, goles_favor, goles_contra, posicion, id]
     );
 
-    // 🔥 RESPUESTA QUE ESPERA EL FRONT
-    res.json({ mensaje: 'Equipo actualizado', ok: true });
+    res.json({ mensaje: 'Equipo actualizado' });
   } catch (err) {
-    console.error('Error en actualizarEquipoAnual:', err);
+    console.error('Error en actualizarEquipo:', err);
     res.status(500).json({ error: 'Error al actualizar equipo' });
   }
 };
 
-// ===============================
-// DELETE equipo anual
-// ===============================
-exports.eliminarEquipoAnual = async (req, res) => {
+// =======================================
+// DELETE equipo
+// =======================================
+exports.eliminarEquipo = async (req, res) => {
   try {
+    const { tipo } = req.body;
     const { id } = req.params;
 
-    await db.query('DELETE FROM tabla_anual WHERE id=?', [id]);
+    if (!tipo || !['anual', 'clausura'].includes(tipo)) {
+      return res.status(400).json({ error: 'Tipo inválido' });
+    }
 
-    // 🔥 RESPUESTA QUE ESPERA EL FRONT
-    res.json({ mensaje: 'Equipo eliminado', ok: true });
+    const tabla = tipo === 'anual' ? 'tabla_anual' : 'tabla_clausura';
+
+    await db.query(`DELETE FROM ${tabla} WHERE id=?`, [id]);
+
+    res.json({ mensaje: 'Equipo eliminado' });
   } catch (err) {
-    console.error('Error en eliminarEquipoAnual:', err);
+    console.error('Error en eliminarEquipo:', err);
     res.status(500).json({ error: 'Error al eliminar equipo' });
   }
 };
