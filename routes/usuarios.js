@@ -19,7 +19,7 @@ router.post('/login', ctrl.login);
 router.get('/me', auth, async (req, res) => {
   try {
     const [rows] = await db.query(
-      'SELECT id, nombre, apellido, email, rol, foto FROM usuarios WHERE id = ?',
+      'SELECT id, nombre, apellido, email, telefono, rol, foto FROM usuarios WHERE id = ?',
       [req.user.id]
     );
 
@@ -34,6 +34,7 @@ router.get('/me', auth, async (req, res) => {
       nombre: u.nombre || '',
       apellido: u.apellido || '',
       email: u.email,
+      telefono: u.telefono || '',
       rol: u.rol,
       foto: u.foto || null
     });
@@ -79,7 +80,6 @@ router.put('/actualizar-foto', auth, async (req, res) => {
     return res.status(400).json({ error: 'Debe enviar el nombre del avatar' });
   }
 
-  // Normalizar: agregar .jpg si el front lo envía mal
   if (!foto.endsWith('.jpg')) {
     foto = foto + '.jpg';
   }
