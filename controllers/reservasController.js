@@ -2,130 +2,166 @@
 const db = require('../db');
 const enviarMailReserva = require('../utils/mailer');
 
-/**
- * Crear una reserva
- */
-exports.crearReserva = async (req, res) => {
+/* ==========================================================
+   RESERVA SIN USUARIO LOGEADO (INVITADO)
+   ========================================================== */
+exports.crearReservaInvitado = async (req, res) => {
   try {
-    const { 
-      nombre, 
-      telefono, 
-      email, 
-      fecha, 
-      hora, 
-      cancha = "Principal", 
-      duracion = 1, 
-      tipo = "F7", 
-      mensaje = "" 
-    } = req.body;
+    const { nombre, telefono, email, fecha, hora } = req.body;
 
-    // --- VALIDACIÓN BÁSICA ---
     if (!nombre || !telefono || !email || !fecha || !hora) {
-      return res.status(400).json({
-        ok: false,
-        mensaje: "Faltan datos obligatorios"
-      });
+      return res.status(400).json({ ok: false, mensaje: "Faltan datos obligatorios" });
     }
 
-    // --- VALIDACIÓN HORARIA ---
-    const [hh, mm] = hora.split(":").map(n => parseInt(n, 10));
+    // Validar formato de hora
+    const [hh, mm] = hora.split(":").map(n => parseInt(n));
     if (mm !== 0) {
-      return res.status(400).json({
-        ok: false,
-        mensaje: "Las reservas deben comenzar en punto (XX:00)"
-      });
+      return res.status(400).json({ ok: false, mensaje: "Las reservas deben ser a en punto (HH:00)" });
     }
     if (hh < 19 || hh > 22) {
-      return res.status(400).json({
-        ok: false,
-        mensaje: "El horario permitido es de 19:00 a 23:00"
-      });
-    }
-    if (![1, 2].includes(Number(duracion))) {
-      return res.status(400).json({
-        ok: false,
-        mensaje: "La duración debe ser 1 o 2 horas"
-      });
+      return res.status(400).json({ ok: false, mensaje: "El horario permitido es de 19:00 a 23:00" });
     }
 
-    // --- VALIDAR SOLAPAMIENTO DE RESERVAS ---
-    const checkSql = `
-      SELECT * FROM reservas
-      WHERE fecha = ?
-      AND cancha = ?
-      AND (
-        (hora = ?) OR
-        (TIME(hora) = TIME(DATE_ADD(?, INTERVAL 1 HOUR)))
-      )
-    `;
-    const [existe] = await db.query(checkSql, [fecha, cancha, hora, hora]);
-    if (existe.length > 0) {
-      return res.status(409).json({
-        ok: false,
-        mensaje: "Horario no disponible. Ya hay una reserva en esa franja."
-      });
+    // Validar si ya está ocupada la hora
+    const [yaExiste] = await db.query(
+      "SELECT id FROM reservas WHERE fecha = ? AND hora = ?",
+      [fecha, hora]
+    );
+
+    if (yaExiste.length > 0) {
+      return res.status(409).json({ ok: false, mensaje: "Horario no disponible." });
     }
 
-    // --- GUARDAR EN DB ---
+    // Guardar la reserva
     const insertSql = `
-      INSERT INTO reservas (nombre, telefono, email, fecha, hora, cancha, duracion, tipo, mensaje)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO reservas (fecha, hora, nombre, email, telefono, estado)
+      VALUES (?, ?, ?, ?, ?, 'CONFIRMADA')
     `;
-    const values = [
-      nombre.trim(),
-      telefono.trim(),
-      email.trim(),
+
+    const [result] = await db.query(insertSql, [
       fecha,
       hora,
-      cancha.trim(),
-      duracion,
-      tipo,
-      mensaje.trim()
-    ];
-
-    let result;
-    try {
-      [result] = await db.query(insertSql, values);
-    } catch (dbError) {
-      console.error("❌ Error DB:", dbError);
-      return res.status(500).json({
-        ok: false,
-        mensaje: "Error al guardar la reserva"
-      });
-    }
+      nombre.trim(),
+      email.trim(),
+      telefono.trim()
+    ]);
 
     const reservaId = result.insertId;
 
-    // --- ENVÍO DE MAIL (no rompe la reserva si falla) ---
+    // Intentar enviar email (no rompe si falla)
     try {
-      await enviarMailReserva({
-        nombre,
-        telefono,
-        email,
-        fecha,
-        hora,
-        cancha,
-        duracion,
-        tipo,
-        mensaje
-      });
-      console.log("📧 Mails enviados correctamente");
-    } catch (mailError) {
-      console.error("⚠️ Error enviando mails (reserva guardada):", mailError);
+      await enviarMailReserva({ nombre, telefono, email, fecha, hora });
+    } catch (mailErr) {
+      console.error("⚠️ Error enviando email:", mailErr);
     }
 
-    // --- RESPUESTA ---
     return res.json({
       ok: true,
       reservaId,
-      mensaje: "Reserva creada con éxito"
+      mensaje: "Reserva creada con éxito (invitado)"
     });
 
   } catch (error) {
-    console.error("❌ Error crítico en crearReserva:", error);
-    return res.status(500).json({
-      ok: false,
-      mensaje: "Error interno del servidor"
+    console.error("❌ Error crítico crearReservaInvitado:", error);
+    return res.status(500).json({ ok: false, mensaje: "Error interno del servidor" });
+  }
+};
+
+
+
+/* ==========================================================
+   RESERVA CON USUARIO LOGEADO (TOMA DATOS DEL TOKEN)
+   ========================================================== */
+exports.crearReservaConUsuario = async (req, res) => {
+  try {
+    const { fecha, hora } = req.body;
+
+    if (!fecha || !hora) {
+      return res.status(400).json({ ok: false, mensaje: "Fecha y hora son obligatorias" });
+    }
+
+    const user = req.user; // viene de auth.js
+
+    // Validación de hora
+    const [hh, mm] = hora.split(":").map(n => parseInt(n));
+    if (mm !== 0) {
+      return res.status(400).json({ ok: false, mensaje: "Las reservas deben ser a en punto (HH:00)" });
+    }
+
+    if (hh < 19 || hh > 22) {
+      return res.status(400).json({ ok: false, mensaje: "El horario permitido es de 19:00 a 23:00" });
+    }
+
+    // Validar si ya está ocupada
+    const [yaExiste] = await db.query(
+      "SELECT id FROM reservas WHERE fecha = ? AND hora = ?",
+      [fecha, hora]
+    );
+
+    if (yaExiste.length > 0) {
+      return res.status(409).json({ ok: false, mensaje: "Horario no disponible." });
+    }
+
+    // Insertar reserva
+    const insertSql = `
+      INSERT INTO reservas (fecha, hora, usuario_id, nombre, email, telefono, estado)
+      VALUES (?, ?, ?, ?, ?, ?, 'CONFIRMADA')
+    `;
+
+    const [result] = await db.query(insertSql, [
+      fecha,
+      hora,
+      user.id,
+      user.nombre,
+      user.email,
+      user.telefono || null
+    ]);
+
+    const reservaId = result.insertId;
+
+    // Enviar email
+    try {
+      await enviarMailReserva({
+        nombre: user.nombre,
+        email: user.email,
+        telefono: user.telefono || "",
+        fecha,
+        hora
+      });
+    } catch (mailErr) {
+      console.error("⚠️ Error enviando email:", mailErr);
+    }
+
+    return res.json({
+      ok: true,
+      reservaId,
+      mensaje: "Reserva creada con éxito (usuario logeado)"
     });
+
+  } catch (error) {
+    console.error("❌ Error crítico crearReservaConUsuario:", error);
+    return res.status(500).json({ ok: false, mensaje: "Error interno del servidor" });
+  }
+};
+
+
+
+/* ==========================================================
+   OBTENER TODAS LAS RESERVAS
+   ========================================================== */
+exports.obtenerReservas = async (req, res) => {
+  try {
+    const [rows] = await db.query(`
+      SELECT r.*, u.nombre AS usuario_nombre
+      FROM reservas r
+      LEFT JOIN usuarios u ON u.id = r.usuario_id
+      ORDER BY r.fecha DESC, r.hora ASC
+    `);
+
+    return res.json(rows);
+
+  } catch (err) {
+    console.error("❌ Error obtenerReservas:", err);
+    return res.status(500).json({ ok: false, mensaje: "Error al obtener reservas" });
   }
 };
