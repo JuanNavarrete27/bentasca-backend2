@@ -1,9 +1,10 @@
 const express = require('express');
 const router = express.Router();
+
 const auth = require('../middlewares/auth');
 const soloAdmin = require('../middlewares/soloAdmin');
 
-// 🔹 Importamos el controller con exacta coincidencia de mayúsculas/minúsculas
+// Controller correcto (coincidencia exacta con el nombre del archivo)
 const ctrl = require('../controllers/tablasController');
 
 // ======================================================
