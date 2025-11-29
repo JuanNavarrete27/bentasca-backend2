@@ -1,4 +1,4 @@
-// reservasController.js
+// reservasController.js - VERSIÓN CORREGIDA
 const db = require('../db');
 const enviarMailReserva = require('../utils/mailer');
 
@@ -149,17 +149,35 @@ exports.crearReservaConUsuario = async (req, res) => {
 
 
 /* ==========================================================
-   OBTENER TODAS LAS RESERVAS
+   OBTENER RESERVAS (CORREGIDO - AHORA FILTRA POR FECHA)
    ========================================================== */
 exports.obtenerReservas = async (req, res) => {
   try {
-    const [rows] = await db.query(`
+    const { fecha } = req.query; // Obtener el parámetro fecha de la query
+    
+    let query = `
       SELECT r.*, u.nombre AS usuario_nombre
       FROM reservas r
       LEFT JOIN usuarios u ON u.id = r.usuario_id
-      ORDER BY r.fecha DESC, r.hora ASC
-    `);
+    `;
+    
+    let params = [];
+    
+    // Si se proporciona una fecha, agregar el filtro WHERE
+    if (fecha) {
+      query += ` WHERE DATE(r.fecha) = DATE(?)`;
+      params.push(fecha);
+      console.log('🔍 Filtrando reservas para fecha:', fecha);
+    }
+    
+    query += ` ORDER BY r.fecha DESC, r.hora ASC`;
 
+    console.log('📋 Query ejecutada:', query);
+    console.log('📋 Parámetros:', params);
+
+    const [rows] = await db.query(query, params);
+
+    console.log('📊 Reservas encontradas:', rows.length);
     return res.json(rows);
 
   } catch (err) {
