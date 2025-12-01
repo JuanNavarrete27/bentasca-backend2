@@ -1,24 +1,23 @@
 // routes/usuarios.js
 const express = require('express');
 const router = express.Router();
-
 const auth = require('../middlewares/auth');
 const soloAdmin = require('../middlewares/soloAdmin');
 const ctrl = require('../controllers/usuariosController');
+const db = require('../db');
+const bcrypt = require('bcryptjs');
 
-// ================================
+// -------------------------
 // AUTH PÚBLICO
-// ================================
+// -------------------------
 router.post('/register', ctrl.register);
 router.post('/login', ctrl.login);
 
-// ================================
-// PERFIL DEL USUARIO AUTENTICADO
-// ================================
-router.get('/me', auth, ctrl.getUserMe || async (req, res) => {
-  // fallback si tu controller aún no trae getUserMe
+// -------------------------
+// PERFIL DEL USUARIO LOGUEADO
+// -------------------------
+router.get('/me', auth, async (req, res) => {
   try {
-    const db = require('../db');
     const [rows] = await db.query(
       'SELECT id, nombre, apellido, email, telefono, rol, foto FROM usuarios WHERE id = ?',
       [req.user.id]
@@ -29,6 +28,7 @@ router.get('/me', auth, ctrl.getUserMe || async (req, res) => {
     }
 
     const u = rows[0];
+
     res.json({
       id: u.id,
       nombre: u.nombre || '',
@@ -44,16 +44,37 @@ router.get('/me', auth, ctrl.getUserMe || async (req, res) => {
   }
 });
 
-// ================================
-// CAMBIAR PASSWORD
-// ================================
-router.put('/cambiar-password', auth, ctrl.cambiarPassword);
+// -------------------------
+// CAMBIAR CONTRASEÑA
+// -------------------------
+router.put('/cambiar-password', auth, async (req, res) => {
+  const { actual, nueva } = req.body;
 
-// ================================
+  if (!actual || !nueva) {
+    return res.status(400).json({ error: 'Faltan datos' });
+  }
+
+  try {
+    const [rows] = await db.query('SELECT password FROM usuarios WHERE id = ?', [req.user.id]);
+    if (rows.length === 0) return res.status(404).json({ error: 'Usuario no encontrado' });
+
+    const passwordValido = bcrypt.compareSync(actual, rows[0].password);
+    if (!passwordValido) return res.status(401).json({ error: 'Contraseña actual incorrecta' });
+
+    const hash = bcrypt.hashSync(nueva, 10);
+    await db.query('UPDATE usuarios SET password = ? WHERE id = ?', [hash, req.user.id]);
+
+    res.json({ mensaje: 'Contraseña actualizada' });
+  } catch (err) {
+    console.error('Error en cambiar-password:', err);
+    res.status(500).json({ error: 'Error del servidor' });
+  }
+});
+
+// -------------------------
 // ACTUALIZAR FOTO
-// ================================
+// -------------------------
 router.put('/actualizar-foto', auth, async (req, res) => {
-  const db = require('../db');
   let { foto } = req.body;
 
   if (!foto) {
@@ -83,9 +104,9 @@ router.put('/actualizar-foto', auth, async (req, res) => {
   }
 });
 
-// ================================
+// -------------------------
 // ADMIN
-// ================================
+// -------------------------
 router.get('/', auth, soloAdmin, ctrl.listUsers);
 router.get('/:id', auth, soloAdmin, ctrl.getUser);
 router.put('/:id', auth, soloAdmin, ctrl.updateUser);
